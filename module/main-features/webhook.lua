@@ -1,11 +1,3 @@
--- ===========================
--- FISH WEBHOOK FEATURE V3 (OPTIMIZED)
--- Pre-caches ALL data during Init
--- Queue-based sending with retry
--- Zero freeze on fish catch
--- Async thumbnail loading (non-blocking)
--- ========================
-
 local FishWebhookV3 = {}
 FishWebhookV3.__index = FishWebhookV3
 
@@ -491,7 +483,7 @@ local function buildEmbed(info)
         description = string.format("**Player:** %s", hide(LocalPlayer.Name)),
         color = info.shiny and 0xFFD700 or 0x030303,
         timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        footer = {text = "NoctisHub | Fish-It Notifier"},
+        footer = {text = "XuKrostHub | Fish-It Notifier"},
         fields = {
             {name = label(EMOJI.fish, "Fish Name"), value = box(info.name or "Unknown"), inline = false},
             {name = label(EMOJI.weight, "Weight"), value = box(formatWeight(info.weight)), inline = true},
@@ -534,7 +526,7 @@ local function processQueue()
         if not item then continue end
         
         local success, err = sendWebhook({
-            username = "Noctis Notifier",
+            username = "ExsHub Notifier",
             embeds = {item.embed}
         })
         
@@ -737,7 +729,7 @@ end
 function FishWebhookV3:TestWebhook(msg)
     if state.webhookUrl == "" then return false end
     return sendWebhook({
-        username = "Noctis Notifier",
+        username = "ExsHub Notifier",
         content = msg or "🟠 Test from Fish-It v3"
     })
 end

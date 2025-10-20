@@ -1,14 +1,3 @@
--- ===========================
--- AUTO TELEPORT PLAYER FEATURE
--- API disamakan dengan AutoTeleportIsland:
---   :Init(guiControls) -> bool
---   :SetTarget(playerName) -> bool
---   :Teleport(optionalPlayerName) -> bool
---   :GetPlayerList(excludeSelf) -> {string}
---   :GetStatus() -> table
---   :Cleanup() -> ()
--- ===========================
-
 local AutoTeleportPlayer = {}
 AutoTeleportPlayer.__index = AutoTeleportPlayer
 
