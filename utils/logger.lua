@@ -19,7 +19,7 @@ Logger.config = {
     level = Logger.LEVELS.INFO,  -- Change to NONE for production
     showTimestamp = true,
     showLevel = true,
-    prefix = "[Noctis]",
+    prefix = "[ExsHub]",
     colors = {
         DEBUG = "\27[36m",  -- Cyan
         INFO = "\27[32m",   -- Green
@@ -121,6 +121,6 @@ function Logger.enableAll()
 end
 
 -- Global logger instance
-_G.Logger = Logger.new("Noctis")
+_G.Logger = Logger.new("ExsHub")
 
 return Logger
