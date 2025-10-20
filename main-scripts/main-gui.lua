@@ -10,7 +10,7 @@ local mainLogger = Logger.new("Main")
 local featureLogger = Logger.new("FeatureManager")
 
 --// Library
-local Noctis = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/lib.lua"))()
+local ExsHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/lib.lua"))()
 
 -- ===========================
 -- LOAD HELPERS & FEATURE MANAGER
@@ -68,7 +68,7 @@ local CancelFishingEvent = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.
 -- INITIALIZE FEATURE MANAGER
 -- ===========================
 mainLogger:info("Initializing features synchronously...")
-local loadedCount, totalCount = FeatureManager:InitializeAllFeatures(Noctis, featureLogger)
+local loadedCount, totalCount = FeatureManager:InitializeAllFeatures(ExsHub, featureLogger)
 mainLogger:info(string.format("Features ready: %d/%d", loadedCount, totalCount))
 
 local function gradient(text, startColor, endColor)
@@ -134,8 +134,8 @@ endColor = endColor or Color3.fromRGB(0, 200, 200)        -- Teal
     return result
 end
 
-local Window = Noctis:Window({
-	Title = "Noctis",
+local Window = ExsHub:Window({
+	Title = "ExsHub",
 	Subtitle = "Fish It | v1.0.1",
 	Size = UDim2.fromOffset(600, 300),
 	DragStyle = 1,
@@ -190,9 +190,9 @@ Information:Button({
 	Callback = function()
 		if typeof(setclipboard) == "function" then
             setclipboard(DISCORD)
-            Window:Notify({ Title = "Noctis", Desc = "Discord link copied!", Duration = 2 })
+            Window:Notify({ Title = "ExsHub", Desc = "Discord link copied!", Duration = 2 })
         else
-            Window:Notify({ Title = "Noctis", Desc = "Clipboard not available", Duration = 3 })
+            Window:Notify({ Title = "ExsHub", Desc = "Clipboard not available", Duration = 3 })
         end
     end
 })
@@ -1698,7 +1698,7 @@ end
 task.defer(function()
     task.wait(0.1)
     Window:Notify({
-        Title = "Noctis",
+        Title = "ExsHub",
         Desc = "Enjoy! Join Our Discord!",
         Duration = 3
     })
