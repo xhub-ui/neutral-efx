@@ -1,4 +1,4 @@
-local Logger       = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/utils/logger.lua"))()
+local Logger       = loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/utils/logger.lua"))()
 
 -- FOR PRODUCTION: Uncomment this line to disable all logging
 --Logger.disableAll()
@@ -16,10 +16,10 @@ local ExsHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r
 -- LOAD HELPERS & FEATURE MANAGER
 -- ===========================
 mainLogger:info("Loading Helpers...")
-local Helpers = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/module/f/helpers.lua"))()
+local Helpers = loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/helpers/helperss.lua"))()
 
 mainLogger:info("Loading FeatureManager...")
-local FeatureManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/module/f/featuremanager.lua"))()
+local FeatureManager = loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/helpers/feature-manager.lua"))()
 
 -- ===========================
 -- GLOBAL SERVICES & VARIABLES
@@ -175,7 +175,7 @@ local CHANGELOG = table.concat({
     "[-] Removed Player Stats (for now)"
 }, "\n")
 local DISCORD = table.concat({
-    "https://discord.gg/3AzvRJFT3M",
+    "https://discord.gg/RpYcMdzzwd",
 }, "\n")
 
 --- === HOME === ---
