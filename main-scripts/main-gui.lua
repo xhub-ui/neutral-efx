@@ -10,7 +10,7 @@ local mainLogger = Logger.new("Main")
 local featureLogger = Logger.new("FeatureManager")
 
 --// Library
-local ExsHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/lib.lua"))()
+local ExsHub = loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/lib.lua"))()
 
 -- ===========================
 -- LOAD HELPERS & FEATURE MANAGER
