@@ -234,7 +234,7 @@ function Auto.new(opts)
     -- NEW: Auto-create stone watcher if not provided
     if not stoneWatcher then
         local ok, StoneWatcherMod = pcall(function()
-            return loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/utils/fishit/itemwatcher.lua"))()
+            return loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/utils/detectors/item-watcher.lua"))()
         end)
         if ok and StoneWatcherMod then
             stoneWatcher = StoneWatcherMod.getShared()

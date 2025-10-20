@@ -1,13 +1,3 @@
--- ===========================
--- AUTO BUY WEATHER FEATURE
--- File: autobuyweather.lua
--- ===========================
--- AUTO BUY WEATHER (multi-select)
--- Lifecycle: :Init(guiControls?), :Start(config?), :Stop(), :Cleanup()
--- Setters  : :SetWeathers({ "Shark Hunt", ... }), :SetInterPurchaseDelay(number)
--- Helpers  : :GetBuyableWeathers() -> {names}
--- ===========================
-
 local AutoBuyWeather = {}
 AutoBuyWeather.__index = AutoBuyWeather
 

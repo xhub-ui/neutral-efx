@@ -8,7 +8,7 @@ local logger = _G.Logger and _G.Logger.new("AutoFavoriteFishV2") or {
 
 local RS = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local FishWatcher = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/utils/fishit/fishwatcher.lua"))()
+local FishWatcher = loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/utils/detectors/fish-watcher.lua"))()
 
 local running = false
 local hbConn = nil

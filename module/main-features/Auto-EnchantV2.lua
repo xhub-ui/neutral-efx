@@ -1,13 +1,3 @@
---========================================================
--- autoenchantrodv2.lua (V2 - TRANSCENDED STONE VERSION - PATCHED)
---========================================================
--- Changes from V1:
---  - Uses RE/ActivateSecondEnchantingAltar instead of RE/ActivateEnchantingAltar
---  - Detects "Transcended Stone" (name) instead of "Enchant Stone"
---  - Type/Category tetap "EnchantStones" (sama seperti V1)
---  - PATCHED: Integrated with EnchantStoneWatcher
---========================================================
-
 local logger = _G.Logger and _G.Logger.new("AutoEnchantRodV2") or {
     debug = function() end,
     info = function() end,
@@ -230,7 +220,7 @@ function Auto.new(opts)
     
     if not watcher and opts.attemptAutoWatcher then
         local ok, Mod = pcall(function()
-            return loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/utils/fishit/itemwatcher.lua"))()
+            return loadstring(game:HttpGet("https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/utils/detectors/item-watcher.lua"))()
         end)
         if ok and Mod then
             watcher = Mod.getShared()
