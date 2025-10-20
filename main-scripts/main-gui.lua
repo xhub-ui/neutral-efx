@@ -162,16 +162,11 @@ local Setting    = Group:Tab({ Title = "Settings", Image = "settings"})
 
 --- === CHANGELOG & DISCORD LINK === ---
 local CHANGELOG = table.concat({
-    "[/] New UI",
     "[/] Improved Webhook",
     "[/] Fixed some lag",
     "[/] Anti AFK now always active",
-    "[/] Auto Send Trade ignored favorited fish",
     "[/] Boost FPS now toggle, can be saved by config",
-    "[+] Added Auto Quest Ghostfinn",
     "[+] Added No Clip",
-    "[+] Added Balatant Mode for Auto Fishing (Unstable)",
-    "[-] Removed Player Stats (for now)"
 }, "\n")
 local DISCORD = table.concat({
     "https://discord.gg/RpYcMdzzwd",
