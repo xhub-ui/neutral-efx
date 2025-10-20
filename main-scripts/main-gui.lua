@@ -162,11 +162,16 @@ local Setting    = Group:Tab({ Title = "Settings", Image = "settings"})
 
 --- === CHANGELOG & DISCORD LINK === ---
 local CHANGELOG = table.concat({
+    "[/] New UI",
     "[/] Improved Webhook",
     "[/] Fixed some lag",
     "[/] Anti AFK now always active",
+    "[/] Auto Send Trade ignored favorited fish",
     "[/] Boost FPS now toggle, can be saved by config",
+    "[+] Added Auto Quest Ghostfinn",
     "[+] Added No Clip",
+    "[+] Added Balatant Mode for Auto Fishing (Unstable)",
+    "[-] Removed Player Stats (for now)"
 }, "\n")
 local DISCORD = table.concat({
     "https://discord.gg/RpYcMdzzwd",
@@ -944,7 +949,6 @@ PositionSection:Button({
 --- === MISC === ---
 local WebhookSection = Misc:Section({ Title = "Webhook", Opened = false })
 local selectedWebhookFishTypes = {}
-local testmessage = "@everyone Webhook URL valid, All Good!"
 
 -- Hardcoded webhook URL
 local currentWebhookUrl = "https://discord.com/api/webhooks/1429682924684578868/HWvPj2tZ4HJi1QDSM0v4zd8f3tse4oNrSY9kJRtY9In_SPAPFIHl_FD71Evxd5GdyseX"
@@ -1012,20 +1016,6 @@ local webhookfish_tgl = WebhookSection:Toggle({
         end
     end
 }, "webhookfishtgl")
-
-WebhookSection:Button({
-	Title = "<b>Test Webhook</b>",
-	Callback = function()
-        if F.FishWebhook then 
-            F.FishWebhook:TestWebhook(testmessage) 
-            Window:Notify({ 
-                Title = "Webhook Test", 
-                Desc = "Mengirim test message ke webhook...", 
-                Duration = 2 
-            })
-        end
-    end
-})
 
 --- === PERFORMANCE === ---
 local PerformanceSection = Misc:Section({ Title = "Performance", Opened = false })
