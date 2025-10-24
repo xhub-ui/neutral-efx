@@ -70,13 +70,13 @@ function FeatureManager:LoadSingleFeature(featureName, url, logger)
         self.LoadedCount = self.LoadedCount + 1
         
         if logger then
-            logger:info(string.format("✓ %s loaded (%d/%d)", 
+            logger:info(string.format("%s loaded (%d/%d)", 
                 featureName, self.LoadedCount, self.TotalFeatures))
         end
         return true
     else
         if logger then
-            logger:warn(string.format("✗ Failed to load %s: %s", featureName, result or "Unknown error"))
+            logger:warn(string.format("Failed to load %s: %s", featureName, result or "Unknown error"))
         end
         return false
     end
@@ -92,7 +92,7 @@ function FeatureManager:InitializeAllFeatures(notifyLib, logger)
         game.StarterGui:SetCore(
         "SendNotification",
         {
-            Title = "Noctis",
+            Title = "EXSLib",
             Text = "Loading Script...",
             Icon = "rbxassetid://127523276881123",
             Duration = 10
@@ -135,7 +135,7 @@ function FeatureManager:InitializeAllFeatures(notifyLib, logger)
         game.StarterGui:SetCore(
         "SendNotification",
         {
-            Title = "Noctis",
+            Title = "EXSLib",
             Text = string.format("%d/%d features loaded successfully", successCount, self.TotalFeatures),
             Icon = "rbxassetid://127523276881123",
             Duration = 5
