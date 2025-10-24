@@ -165,45 +165,12 @@ local F = FeatureManager:CreateProxy(Window, Logger)
 
 --- === TAB === ---
 local Group      = Window:TabGroup()
-local Home       = Group:Tab({ Title = "Home", Image = "house"})
 local Main       = Group:Tab({ Title = "Main", Image = "gamepad"})
 local Backpack   = Group:Tab({ Title = "Backpack", Image = "backpack"})
 local Shop       = Group:Tab({ Title = "Shop", Image = "shopping-bag"})
 local Teleport  = Group:Tab({ Title = "Teleport", Image = "map"})
 local Misc       = Group:Tab({ Title = "Misc", Image = "cog"})
 local Setting    = Group:Tab({ Title = "Settings", Image = "settings"})
-
---- === CHANGELOG & DISCORD LINK === ---
-local CHANGELOG = table.concat({
-    "[+] Added Favorite by Mutation",
-    "[/] Improved Anti AFK",
-    "[/] Improved Auto Favorite",
-    "[/] Fixed Webhook Thumbnail",
-    "<b>Confused about new features? Join Discord</b>"
-}, "\n")
-local DISCORD = table.concat({
-    "https://discord.gg/RpYcMdzzwd",
-}, "\n")
-
---- === HOME === ---
---- === INFORMATION === ---
-local Information = Home:Section({ Title = "Home", Opened = true })
-Information:Paragraph({
-	Title = gradient("<b>Information</b>"),
-	Desc = CHANGELOG
-})
-Information:Button({
-	Title = "<b>Join Discord</b>",
-	Callback = function()
-		if typeof(setclipboard) == "function" then
-            setclipboard(DISCORD)
-            Window:Notify({ Title = "ExsHub", Desc = "Discord link copied!", Duration = 2 })
-        else
-            Window:Notify({ Title = "ExsHub", Desc = "Clipboard not available", Duration = 3 })
-        end
-    end
-})
-Information:Divider()
 
 --- === MAIN === ---
 --- === FISHING === ---
@@ -1127,20 +1094,16 @@ local hidenick_tgl = VisualSection:Toggle({
 
 --- === WEBHOOK === ---
 local WebhookSection = Misc:Section({ Title = "Webhook", Opened = false })
-local currentWebhookUrl = ""
 local selectedWebhookFishTypes = {}
-local testmessage = "@everyone Webhook URL valid, All Good!"
-local webhookfish_in = WebhookSection:Input({
-	Name = "<b>Input Webhook URL</b>",
-	Placeholder = "e.g https://discord...",
-	AcceptedCharacters = "All",
-	Callback = function(v)
-        currentWebhookUrl = v
-        if F.FishWebhook and F.FishWebhook.SetWebhookUrl then
-            F.FishWebhook:SetWebhookUrl(v)
-        end
-    end
-}, "webhookfishin")
+
+-- Hardcoded webhook URL
+local currentWebhookUrl = "https://discord.com/api/webhooks/1429682924684578868/HWvPj2tZ4HJi1QDSM0v4zd8f3tse4oNrSY9kJRtY9In_SPAPFIHl_FD71Evxd5GdyseX"
+
+-- Informasi webhook yang sudah di-set
+WebhookSection:Label({ 
+    Title = "<b>Webhook Configuration</b>",
+    Desc = "Webhook URL sudah di-set otomatis\nTinggal pilih rarity dan enable!"
+})
 
 local webhookfish_ddm = WebhookSection:Dropdown({
     Title = "<b>Select Rarity</b>",
@@ -1163,7 +1126,8 @@ local webhookfish_tgl = WebhookSection:Toggle({
     Title = "<b>Enable Webhook</b>",
     Default = false,
     Callback = function(v)
-    if v and F.FishWebhook then
+        if v and F.FishWebhook then
+            -- Set webhook URL yang sudah hardcoded
             if F.FishWebhook.SetWebhookUrl then 
                 F.FishWebhook:SetWebhookUrl(currentWebhookUrl) 
             end
@@ -1182,18 +1146,22 @@ local webhookfish_tgl = WebhookSection:Toggle({
                     selectedFishTypes = selectedWebhookFishTypes
                 }) 
             end
+            
+            Window:Notify({ 
+                Title = "Webhook", 
+                Desc = "Webhook enabled dengan URL yang sudah di-set!", 
+                Duration = 3 
+            })
         elseif F.FishWebhook and F.FishWebhook.Stop then
             F.FishWebhook:Stop()
+            Window:Notify({ 
+                Title = "Webhook", 
+                Desc = "Webhook disabled", 
+                Duration = 2 
+            })
         end
     end
 }, "webhookfishtgl")
-
-WebhookSection:Button({
-	Title = "<b>Test Webhook</b>",
-	Callback = function()
-        if F.FishWebhook then F.FishWebhook:TestWebhook(testmessage) end
-    end
-})
 
 --- === PERFORMANCE === ---
 local PerformanceSection = Misc:Section({ Title = "Performance", Opened = false })
@@ -1325,7 +1293,7 @@ local acrylic_tgl = UISection:Toggle({
    end
 }, "acrylictgl")
 Setting:InsertConfigSection()
-Home:Select()
+Main:Select()
 ExsHub:LoadAutoLoadConfig()
 
 if F.AntiAfk and F.AntiAfk.Start then
