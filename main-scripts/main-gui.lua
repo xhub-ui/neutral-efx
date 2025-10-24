@@ -52,6 +52,19 @@ pcall(function()
     _G.InventoryWatcher = loadstring(game:HttpGet("https://raw.githubusercontent.com/c3iv3r/a/refs/heads/main/utils/fishit/inventdetect3.lua"))()
 end)]]
 
+_G.SpamFishingActive = false
+
+-- Spawn loop langsung
+task.spawn(function()
+    while task.wait(0.1) do
+        if _G.SpamFishingActive and _G.NetPath then
+            pcall(function()
+                _G.NetPath["RE/FishingCompleted"]:FireServer()
+            end)
+        end
+    end
+end)
+
 -- Cache helper results
 local listRod = Helpers.getFishingRodNames()
 local weatherName = Helpers.getWeatherNames()
@@ -136,11 +149,11 @@ end
 
 local Window = ExsHub:Window({
 	Title = "ExsHub",
-	Subtitle = "Fish It | v1.0.1",
+	Subtitle = "Fish It | v1.0.5",
 	Size = UDim2.fromOffset(600, 300),
 	DragStyle = 1,
 	DisabledWindowControls = {},
-	OpenButtonImage = "rbxassetid://123156553209294", 
+	OpenButtonImage = "rbxassetid://127523276881123", 
 	OpenButtonSize = UDim2.fromOffset(32, 32),
 	OpenButtonPosition = UDim2.fromScale(0.45, 0.1),
 	Keybind = Enum.KeyCode.RightControl,
@@ -162,16 +175,11 @@ local Setting    = Group:Tab({ Title = "Settings", Image = "settings"})
 
 --- === CHANGELOG & DISCORD LINK === ---
 local CHANGELOG = table.concat({
-    "[/] New UI",
-    "[/] Improved Webhook",
-    "[/] Fixed some lag",
-    "[/] Anti AFK now always active",
-    "[/] Auto Send Trade ignored favorited fish",
-    "[/] Boost FPS now toggle, can be saved by config",
-    "[+] Added Auto Quest Ghostfinn",
-    "[+] Added No Clip",
-    "[+] Added Balatant Mode for Auto Fishing (Unstable)",
-    "[-] Removed Player Stats (for now)"
+    "[+] Added Favorite by Mutation",
+    "[/] Improved Anti AFK",
+    "[/] Improved Auto Favorite",
+    "[/] Fixed Webhook Thumbnail",
+    "<b>Confused about new features? Join Discord</b>"
 }, "\n")
 local DISCORD = table.concat({
     "https://discord.gg/RpYcMdzzwd",
@@ -201,12 +209,14 @@ Information:Divider()
 --- === FISHING === ---
 local FishingSection = Main:Section({ Title = "Fishing", Opened = false })
 
--- Create proxy for clean access (replaces all Get() and Init() calls)
-
-
 -- State tracking
 local currentMethod = "V1" -- default
 local isAutoFishActive = false
+
+-- Balatant V5 delay configs
+local balatantWaitWindow = 0.6         -- Default 600ms (ReplicateText check window)
+local balatantSafetyTimeout = 3        -- Default 3s (Safety net timeout)
+local balatantBaitSpawnedDelay = 0
 
 -- Function untuk stop semua
 local function stopAllAutoFish()
@@ -218,6 +228,12 @@ local function stopAllAutoFish()
     end
     if F.AutoFishV3 and F.AutoFishV3.Stop then
         F.AutoFishV3:Stop()
+    end
+    if F.Balatant and F.Balatant.Stop then
+        F.Balatant:Stop()
+    end
+    if F.BalatantV2 and F.BalatantV2.Stop then
+        F.BalatantV2:Stop()
     end
 end
 
@@ -231,6 +247,15 @@ local function startAutoFish(method)
         F.AutoFishV2:Start({ mode = "Fast" })
     elseif method == "V3" and F.AutoFishV3 and F.AutoFishV3.Start then
         F.AutoFishV3:Start({ mode = "Fast" })
+    elseif method == "Balatant" and F.Balatant and F.Balatant.Start then
+        F.Balatant:Start({
+            mode = "Fast",
+            waitWindow = balatantWaitWindow,
+            safetyTimeout = balatantSafetyTimeout,
+            baitSpawnedDelay = balatantBaitSpawnedDelay
+        })
+    elseif method == "Balatant V2" and F.BalatantV2 and F.BalatantV2.Start then
+        F.BalatantV2:Start({ mode = "Fast" })
     end
 end
 
@@ -241,7 +266,7 @@ local autofish_dd = FishingSection:Dropdown({
     Search = true,
     Multi = false,
     Required = false,
-    Options = {"Fast", "Stable", "Normal"},
+    Options = {"Balatant (Delay)", "Balatant (Old)", "Fast", "Stable", "Normal"},
     Default = "Fast",
     Callback = function(v)
         -- Map dropdown value ke method
@@ -251,6 +276,10 @@ local autofish_dd = FishingSection:Dropdown({
             currentMethod = "V2"
         elseif v == "Normal" then
             currentMethod = "V3"
+        elseif v == "Balatant (Delay)" then
+            currentMethod = "Balatant"
+        elseif v == "Balatant (Old)" then 
+            currentMethod = "Balatant V2"
         end
         
         -- Kalo lagi aktif, restart dengan method baru
@@ -259,6 +288,42 @@ local autofish_dd = FishingSection:Dropdown({
         end
     end
 }, "autofishdd")
+
+-- Detection Window Input (WAIT_WINDOW)
+local baitdelay_in = FishingSection:Input({
+    Name = "<b>Detection Window</b>",
+    Placeholder = "e.g 0.6 (seconds)",
+    AcceptedCharacters = "Numbers",
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 0.05 and n <= 5 then
+            balatantWaitWindow = n
+            
+            -- Update runtime kalo Balatant lagi jalan
+            if isAutoFishActive and currentMethod == "Balatant" and F.Balatant then
+                F.Balatant:SetDelays(balatantWaitWindow, nil)
+            end
+        end
+    end
+}, "baitdelayin")
+
+-- Cast Delay Input (SAFETY_TIMEOUT)
+local chargedelay_in = FishingSection:Input({
+    Name = "<b>Cast Delay</b>",
+    Placeholder = "e.g 3 (seconds)",
+    AcceptedCharacters = "Numbers",
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 1 and n <= 30 then
+            balatantSafetyTimeout = n
+            
+            -- Update runtime kalo Balatant lagi jalan
+            if isAutoFishActive and currentMethod == "Balatant" and F.Balatant then
+                F.Balatant:SetDelays(nil, balatantSafetyTimeout)
+            end
+        end
+    end
+}, "chargedelayin")
 
 local autofish_tgl = FishingSection:Toggle({
     Title = "<b>Auto Fishing</b>",
@@ -275,6 +340,15 @@ local autofish_tgl = FishingSection:Toggle({
         end
     end
 }, "autofishtgl")
+
+local autofinish_tgl = FishingSection:Toggle({
+    Title = "<b>Auto Finish Fishing</b>",
+    Default = false,
+    Callback = function(v)
+        _G.SpamFishingActive = v
+    end
+}, "autofinishtgl")
+        
 
 local noanim_tgl = FishingSection:Toggle({
 	Title = "<b>No Animation</b>",
@@ -427,8 +501,9 @@ local FavoriteSection = Backpack:Section({ Title = "Favorite", Opened = false })
 local isFavActive = false
 local selectedRarities = {}
 local selectedFishNames = {}
+local selectedMutations = {}
 
-FavoriteSection:Label({ Title = "<b>Tip: Select ONLY by Rarity or by Name, dont use both at same time!</b>"})
+FavoriteSection:Label({ Title = "<b>Tip: You can combine filters! (e.g., Rarity + Mutation, Name + Mutation, or all three)</b>"})
 
 local favrarity_ddm = FavoriteSection:Dropdown({
     Title = "<b>Favorite by Rarity</b>",
@@ -439,8 +514,8 @@ local favrarity_ddm = FavoriteSection:Dropdown({
     Callback = function(v)
         selectedRarities = Helpers.normalizeList(v or {})
         
-        if isFavActive and F.AutoFavoriteFish and F.AutoFavoriteFish.SetTiers then
-            F.AutoFavoriteFish:SetTiers(selectedRarities)
+        if isFavActive and F.AutoFavorite and F.AutoFavorite.SetTiers then
+            F.AutoFavorite:SetTiers(selectedRarities)
         end
     end
 }, "favrarityddm")
@@ -456,11 +531,28 @@ local favfishname_ddm = FavoriteSection:Dropdown({
     Callback = function(v)
         selectedFishNames = Helpers.normalizeList(v or {})
         
-        if isFavActive and F.AutoFavoriteFishV2 and F.AutoFavoriteFishV2.SetSelectedFishNames then
-            F.AutoFavoriteFishV2:SetSelectedFishNames(selectedFishNames)
+        if isFavActive and F.AutoFavorite and F.AutoFavorite.SetFishNames then
+            F.AutoFavorite:SetFishNames(selectedFishNames)
         end
     end
 }, "favfishnameddm")
+
+FavoriteSection:Divider()
+
+local favfishmutation_ddm = FavoriteSection:Dropdown({
+    Title = "<b>Favorite by Fish Mutation</b>",
+    Search = true,
+    Multi = true,
+    Required = false,
+    Values = Helpers.getVariantNames(),
+    Callback = function(v)
+        selectedMutations = Helpers.normalizeList(v or {})
+        
+        if isFavActive and F.AutoFavorite and F.AutoFavorite.SetVariants then
+            F.AutoFavorite:SetVariants(selectedMutations)
+        end
+    end
+}, "favfishmutationddm")
 
 local autofav_tgl = FavoriteSection:Toggle({
     Title = "<b>Auto Favorite</b>",
@@ -469,47 +561,41 @@ local autofav_tgl = FavoriteSection:Toggle({
         isFavActive = v
         
         if v then
-            -- Stop semua dulu
-            if F.AutoFavoriteFish and F.AutoFavoriteFish.Stop then
-                F.AutoFavoriteFish:Stop()
-            end
-            if F.AutoFavoriteFishV2 and F.AutoFavoriteFishV2.Stop then
-                F.AutoFavoriteFishV2:Stop()
-            end
-            
-            -- Prioritas: Rarity > Fish Name
-            if #selectedRarities > 0 and F.AutoFavoriteFish then
-                if F.AutoFavoriteFish.SetTiers then
-                    F.AutoFavoriteFish:SetTiers(selectedRarities)
-                end
-                if F.AutoFavoriteFish.Start then
-                    F.AutoFavoriteFish:Start({ tierList = selectedRarities })
-                end
-                Window:Notify({ Title = "Auto Favorite", Desc = "By Rarity Active", Duration = 2 })
+            if F.AutoFavorite then
                 
-            elseif #selectedFishNames > 0 and F.AutoFavoriteFishV2 then
-                if F.AutoFavoriteFishV2.SetSelectedFishNames then
-                    F.AutoFavoriteFishV2:SetSelectedFishNames(selectedFishNames)
+                if F.AutoFavorite.SetTiers then
+                    F.AutoFavorite:SetTiers(selectedRarities)
                 end
-                if F.AutoFavoriteFishV2.Start then
-                    F.AutoFavoriteFishV2:Start({ fishNames = selectedFishNames })
+                if F.AutoFavorite.SetFishNames then
+                    F.AutoFavorite:SetFishNames(selectedFishNames)
                 end
-                Window:Notify({ Title = "Auto Favorite", Desc = "By Fish Name Active", Duration = 2 })
+                if F.AutoFavorite.SetVariants then
+                    F.AutoFavorite:SetVariants(selectedMutations)
+                end
                 
-            else
+                if F.AutoFavorite.Start then
+                    F.AutoFavorite:Start({
+                        tierList = selectedRarities,
+                        fishNames = selectedFishNames,
+                        variantList = selectedMutations
+                    })
+                end
+                
+                local activeFilters = {}
+                if #selectedRarities > 0 then table.insert(activeFilters, "Rarity") end
+                if #selectedFishNames > 0 then table.insert(activeFilters, "Name") end
+                if #selectedMutations > 0 then table.insert(activeFilters, "Mutation") end
+                
                 Window:Notify({ 
                     Title = "Auto Favorite", 
-                    Desc = "Select rarity or fish name first!", 
+                    Desc = "Active with: " .. table.concat(activeFilters, " + "), 
                     Duration = 3 
                 })
             end
             
         else
-            if F.AutoFavoriteFish and F.AutoFavoriteFish.Stop then
-                F.AutoFavoriteFish:Stop()
-            end
-            if F.AutoFavoriteFishV2 and F.AutoFavoriteFishV2.Stop then
-                F.AutoFavoriteFishV2:Stop()
+            if F.AutoFavorite and F.AutoFavorite.Stop then
+                F.AutoFavorite:Stop()
             end
             Window:Notify({ Title = "Auto Favorite", Desc = "Stopped", Duration = 2 })
         end
@@ -737,7 +823,9 @@ local teleisland_dd = IslandSection:Dropdown({
         "Ice Lake",
         "Weather Machine",
         "Sacred Temple",
-        "Underground Cellar"
+        "Underground Cellar",
+        "Hallow Bay",
+        "Mount Hallow"
     },
        Callback = function(v)
         currentIsland = v or {}
@@ -766,17 +854,16 @@ local PlayerSection = Teleport:Section({ Title = "Player", Opened = false })
 local currentPlayerName = nil
 local teleplayer_dd = PlayerSection:Dropdown({
     Title = "<b>Select Player</b>",
-    Search = true,
-    Multi = false,
-    Required = false,
-    Values = Helpers.listPlayers(true),
+    Values = Helpers.listPlayers(true, function(list)
+        teleplayer_dd:ClearOptions()
+        teleplayer_dd:SetValues(list)
+    end),
     Callback = function(v)
         local name = Helpers.normalizeOption(v)
         currentPlayerName = name
         if F.AutoTeleportPlayer and F.AutoTeleportPlayer.SetTarget then
             F.AutoTeleportPlayer:SetTarget(name)
         end
-        mainLogger:info("[teleplayer] selected:", name)
     end
 }, "teleplayerdd")
 
@@ -797,8 +884,9 @@ PlayerSection:Button({
 PlayerSection:Button({
 	Title = "<b>Refresh Player List</b>",
 	Callback = function()
-        local names = Helpers.listPlayers(true)
-        if teleplayer_dd.Refresh then teleplayer_dd:SetValues(names) end
+        local names = Helpers.listPlayers(true) 
+            teleplayer_dd:ClearOptions()
+            teleplayer_dd:SetValues(names)
         Window:Notify({ Title = "Players", Desc = ("Online: %d"):format(#names), Duration = 2 })
     end
 })
@@ -947,17 +1035,112 @@ PositionSection:Button({
 })
 
 --- === MISC === ---
+--- === VISUAL === ---
+local VisualSection = Misc:Section({ Title = "Visual", Opened = false })
+-- State variables
+local customName = "ExsHub"  -- Default custom name
+local customLevel = "Lv: XXXX"       -- Default custom level
+local nameChangerConnection = nil
+
+-- Function untuk change overhead
+local function changeOverhead()
+    local character = workspace.Characters:FindFirstChild(LocalPlayer.Name)
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local overhead = hrp:FindFirstChild("Overhead")
+    if not overhead then return end
+    
+    -- Ganti Nama
+    local header = overhead:FindFirstChild("Content") and overhead.Content:FindFirstChild("Header")
+    if header and header:IsA("TextLabel") then
+        header.Text = customName
+    end
+    
+    -- Ganti Level
+    local levelLabel = overhead:FindFirstChild("LevelContainer") and overhead.LevelContainer:FindFirstChild("Label")
+    if levelLabel and levelLabel:IsA("TextLabel") then
+        levelLabel.Text = customLevel
+    end
+end
+
+-- Function untuk reset ke original
+local function resetOverhead()
+    local character = workspace.Characters:FindFirstChild(LocalPlayer.Name)
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local overhead = hrp:FindFirstChild("Overhead")
+    if not overhead then return end
+    
+    -- Reset ke nama asli
+    local header = overhead:FindFirstChild("Content") and overhead.Content:FindFirstChild("Header")
+    if header and header:IsA("TextLabel") then
+        header.Text = LocalPlayer.DisplayName or LocalPlayer.Name
+    end
+    
+    -- Reset ke level asli
+    local level = LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Level")
+    if level then
+        local levelLabel = overhead:FindFirstChild("LevelContainer") and overhead.LevelContainer:FindFirstChild("Label")
+        if levelLabel and levelLabel:IsA("TextLabel") then
+            levelLabel.Text = tostring(level.Value)
+        end
+    end
+end
+
+-- Toggle untuk activate name changer
+local hidenick_tgl = VisualSection:Toggle({
+    Title = "<b>Hide Name & Level</b>",
+    Default = false,
+    Callback = function(v)
+        if v then
+            -- Apply custom name/level
+            task.wait(0.5)
+            changeOverhead()
+            
+            -- Setup auto-apply on respawn
+            if nameChangerConnection then
+                nameChangerConnection:Disconnect()
+            end
+            
+            nameChangerConnection = LocalPlayer.CharacterAdded:Connect(function()
+                task.wait(2) -- Wait for overhead to load
+                changeOverhead()
+            end)
+        else
+            -- Reset to original
+            resetOverhead()
+            
+            -- Disconnect auto-apply
+            if nameChangerConnection then
+                nameChangerConnection:Disconnect()
+                nameChangerConnection = nil
+            end
+        end
+    end
+}, "hidenicktgl")
+
+--- === WEBHOOK === ---
 local WebhookSection = Misc:Section({ Title = "Webhook", Opened = false })
+local currentWebhookUrl = ""
 local selectedWebhookFishTypes = {}
-
--- Hardcoded webhook URL
-local currentWebhookUrl = "https://discord.com/api/webhooks/1429682924684578868/HWvPj2tZ4HJi1QDSM0v4zd8f3tse4oNrSY9kJRtY9In_SPAPFIHl_FD71Evxd5GdyseX"
-
--- Informasi webhook yang sudah di-set
-WebhookSection:Label({ 
-    Title = "<b>Webhook Configuration</b>",
-    Desc = "Webhook URL sudah di-set otomatis\nTinggal pilih rarity dan enable!"
-})
+local testmessage = "@everyone Webhook URL valid, All Good!"
+local webhookfish_in = WebhookSection:Input({
+	Name = "<b>Input Webhook URL</b>",
+	Placeholder = "e.g https://discord...",
+	AcceptedCharacters = "All",
+	Callback = function(v)
+        currentWebhookUrl = v
+        if F.FishWebhook and F.FishWebhook.SetWebhookUrl then
+            F.FishWebhook:SetWebhookUrl(v)
+        end
+    end
+}, "webhookfishin")
 
 local webhookfish_ddm = WebhookSection:Dropdown({
     Title = "<b>Select Rarity</b>",
@@ -980,8 +1163,7 @@ local webhookfish_tgl = WebhookSection:Toggle({
     Title = "<b>Enable Webhook</b>",
     Default = false,
     Callback = function(v)
-        if v and F.FishWebhook then
-            -- Set webhook URL yang sudah hardcoded
+    if v and F.FishWebhook then
             if F.FishWebhook.SetWebhookUrl then 
                 F.FishWebhook:SetWebhookUrl(currentWebhookUrl) 
             end
@@ -1000,22 +1182,18 @@ local webhookfish_tgl = WebhookSection:Toggle({
                     selectedFishTypes = selectedWebhookFishTypes
                 }) 
             end
-            
-            Window:Notify({ 
-                Title = "Webhook", 
-                Desc = "Webhook enabled dengan URL yang sudah di-set!", 
-                Duration = 3 
-            })
         elseif F.FishWebhook and F.FishWebhook.Stop then
             F.FishWebhook:Stop()
-            Window:Notify({ 
-                Title = "Webhook", 
-                Desc = "Webhook disabled", 
-                Duration = 2 
-            })
         end
     end
 }, "webhookfishtgl")
+
+WebhookSection:Button({
+	Title = "<b>Test Webhook</b>",
+	Callback = function()
+        if F.FishWebhook then F.FishWebhook:TestWebhook(testmessage) end
+    end
+})
 
 --- === PERFORMANCE === ---
 local PerformanceSection = Misc:Section({ Title = "Performance", Opened = false })
@@ -1137,7 +1315,18 @@ local playeresp_tgl = OtherSection:Toggle({
 end
 }, "playeresptgl")
 
+--- === SETTING === ---
+local UISection = Setting:Section({ Title = "UI Setting", Opened = false })
+local acrylic_tgl = UISection:Toggle({
+    Title = "Acrylic",
+    Default = true,
+    Callback = function(bool)
+       Window:SetAcrylicBlurState(bool)
+   end
+}, "acrylictgl")
 Setting:InsertConfigSection()
+Home:Select()
+ExsHub:LoadAutoLoadConfig()
 
 if F.AntiAfk and F.AntiAfk.Start then
                 F.AntiAfk:Start()
