@@ -10,6 +10,7 @@ local BaitModule = ReplicatedStorage.Baits
 local ItemsModule = ReplicatedStorage.Items
 local WeatherModule = ReplicatedStorage.Events
 local TiersModule = ReplicatedStorage.Tiers
+--local VariantModule = ReplicatedStorage.Variants
 local Replion = require(ReplicatedStorage.Packages.Replion)
 local QuestUtility = require(ReplicatedStorage.Shared.Quests.QuestUtility)
 local QuestList = require(ReplicatedStorage.Shared.Quests.QuestList)
@@ -156,16 +157,31 @@ function Helpers.getEnchantStonesForTrade()
 end
 
 --- Player List
-function Helpers.listPlayers(excludeSelf)
-    local me = LocalPlayer and LocalPlayer.Name
-    local t = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if not excludeSelf or (me and p.Name ~= me) then
-            table.insert(t, p.Name)
+function Helpers.listPlayers(excludeSelf, onUpdate)
+    local function get()
+        local me = LocalPlayer and LocalPlayer.Name
+        local t = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not excludeSelf or (me and p.Name ~= me) then
+                table.insert(t, p.Name)
+            end
         end
+        table.sort(t, function(a, b) return a:lower() < b:lower() end)
+        return t
     end
-    table.sort(t, function(a, b) return a:lower() < b:lower() end)
-    return t
+    
+    if onUpdate then
+        Players.PlayerAdded:Connect(function()
+            task.wait(0.1)
+            onUpdate(get())
+        end)
+        Players.PlayerRemoving:Connect(function()
+            task.wait(0.1)
+            onUpdate(get())
+        end)
+    end
+    
+    return get()
 end
 
 --- Normalize dropdown option
@@ -395,6 +411,66 @@ function Helpers.getDeepSeaQuestProgress()
     table.insert(lines, 2, "")
     
     return table.concat(lines, "\n")
+end
+
+--- Element Jungle
+function Helpers.getElemetJungleQuestProgress()
+    local playerData = Replion.Client:WaitReplion("Data")
+    if not playerData then return "No quest data" end
+    
+    local questData = playerData:Get({"ElementJungle", "Available", "Forever", "Quests"})
+    if not questData then return "No ElementJungle quests" end
+    
+    local elementJungleQuests = QuestList.ElementJungle.Forever
+    local lines = {}
+    local completed = 0
+    local total = 0
+    
+    for index, quest in ipairs(questData) do
+        local questInfo = elementJungleQuests[quest.QuestId]
+        if questInfo then
+            total = total + 1
+            local required = QuestUtility.GetQuestValue(playerData, questInfo)
+            local current = quest.Progress or 0
+            local done = current >= required
+            
+            if done then completed = completed + 1 end
+            
+            local status = done and "✓" or "○"
+            local percentage = math.floor((current / required) * 100)
+            
+            table.insert(lines, string.format(
+                "%s [%d] %s: %.0f/%.0f (%d%%)",
+                status, index, questInfo.DisplayName, current, required, percentage
+            ))
+        end
+    end
+    
+    table.insert(lines, 1, string.format("Progress: %d/%d (%d%%)", completed, total, total > 0 and math.floor((completed/total)*100) or 0))
+    table.insert(lines, 2, "")
+    
+    return table.concat(lines, "\n")
+end
+
+--- Variant Names
+function Helpers.getVariantNames()
+    local variantNames = {}
+    local VariantsFolder = ReplicatedStorage:FindFirstChild("Variants")
+    if not VariantsFolder then 
+        warn("Variants folder not found in ReplicatedStorage")
+        return variantNames 
+    end
+    
+    for _, item in pairs(VariantsFolder:GetChildren()) do
+        if item:IsA("ModuleScript") then
+            local success, moduleData = pcall(require, item)
+            if success and moduleData and moduleData.Data and moduleData.Data.Type == "Variant" and moduleData.Data.Name then
+                table.insert(variantNames, moduleData.Data.Name)
+            end
+        end
+    end
+    table.sort(variantNames)
+    return variantNames
 end
 
 return Helpers

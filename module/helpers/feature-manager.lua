@@ -26,8 +26,7 @@ local FEATURE_URLS = {
     AntiAfk            = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/antiafk.lua",
     AutoEnchantRod     = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Auto-Enchant.lua",
     AutoEnchantRod2    = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Auto-EnchantV2.lua",
-    AutoFavoriteFish   = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Auto-FavFish.lua",
-    AutoFavoriteFishV2 = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Auto-FavFishV2.lua",
+    AutoFavorite       = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Auto-Favorite.lua",
     UnfavoriteAllFish  = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Unfav-Fish.lua",
     AutoTeleportPlayer = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/TP-Players.lua",
     BoostFPS           = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/FPSBoost.lua",
@@ -43,7 +42,9 @@ local FEATURE_URLS = {
     PlayerModif        = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/playermodif.lua",
     AutoSubmitSecret   = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Submit-Secret.lua",
     QuestGhostfinn     = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/ghostfinn-quest.lua",
-    Boat               = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Spawn-Boats.lua"
+    QuestElemental     = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/Quest-Elemental.lua",
+    Balatant          = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/balatant.lua",
+    BalatantV2         = "https://github.com/xhub-ui/neutral-efx/raw/refs/heads/main/module/main-features/blatantV2.lua" 
 }
 
 -- Load single feature synchronously
@@ -91,9 +92,9 @@ function FeatureManager:InitializeAllFeatures(notifyLib, logger)
         game.StarterGui:SetCore(
         "SendNotification",
         {
-            Title = "ExsHub",
+            Title = "Noctis",
             Text = "Loading Script...",
-            Icon = "rbxassetid://123156553209294",
+            Icon = "rbxassetid://127523276881123",
             Duration = 10
         })
     end
@@ -106,11 +107,11 @@ function FeatureManager:InitializeAllFeatures(notifyLib, logger)
     local loadOrder = {
         "AntiAfk", "SavePosition", "PositionManager", "AutoReexec", "BoostFPS", 
         "AutoFish", "AutoFishV2", "AutoFishV3", "AutoSellFish", "AutoTeleportIsland", "AutoTeleportPlayer", 
-        "AutoTeleportEvent", "AutoEnchantRod", "AutoFavoriteFish", "AutoFavoriteFishV2", 
+        "AutoTeleportEvent", "AutoEnchantRod", "AutoFavorite", --"AutoFavoriteFishV2", "AutoFavoriteFishV3",
         "AutoSendTrade", "AutoAcceptTrade", "FishWebhook", "AutoBuyWeather", 
         "AutoBuyBait", "AutoBuyRod", "AutoGearOxyRadar", "CopyJoinServer", 
         "AutoReconnect", "PlayerEsp", "AutoFixFishing", "UnfavoriteAllFish", "PlayerModif", "AutoSubmitSecret", "AutoEnchantRod2", "QuestGhostfinn",
-        "Boat"
+        "QuestElemental", "Balatant", "BalatantV2"
     }
     
     local successCount = 0
@@ -134,9 +135,9 @@ function FeatureManager:InitializeAllFeatures(notifyLib, logger)
         game.StarterGui:SetCore(
         "SendNotification",
         {
-            Title = "ExsHub",
+            Title = "Noctis",
             Text = string.format("%d/%d features loaded successfully", successCount, self.TotalFeatures),
-            Icon = "rbxassetid://123156553209294",
+            Icon = "rbxassetid://127523276881123",
             Duration = 5
         }
     )
