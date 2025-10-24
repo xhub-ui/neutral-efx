@@ -1,506 +1,432 @@
--- ===========================
--- AUTO FISH V5 - ANIMATION CANCEL METHOD [STABLE]
--- Pattern: BaitSpawned → ReplicateTextEffect (dalam 100ms) = normal
---          BaitSpawned tanpa ReplicateTextEffect = cancel
--- Spam FishingCompleted non-stop dari start sampai stop
--- Patokan mancing selesai: ObtainedNewFishNotification
--- ===========================
+-- Anti-AFK (Multi-Layer Bypass for AFKController)
+-- File: Fish-It/antiafkFeature.lua
+-- Supports: Roblox native AFK + custom AFKController bypass
 
-local AutoFishFeature = {}
-AutoFishFeature.__index = AutoFishFeature
+local antiafkFeature = {}
+antiafkFeature.__index = antiafkFeature
 
-local logger = _G.Logger and _G.Logger.new("BAB") or {
-    debug = function() end,
-    info = function() end,
-    warn = function() end,
-    error = function() end
+--// Logger Setup
+local logger = _G.Logger and _G.Logger.new("AntiAFK") or {
+    debug = function(self, msg) print("[AntiAFK][DEBUG]", msg) end,
+    info = function(self, msg) print("[AntiAFK][INFO]", msg) end,
+    warn = function(self, msg) warn("[AntiAFK][WARN]", msg) end,
+    error = function(self, msg) warn("[AntiAFK][ERROR]", msg) end
 }
 
--- Services
+--// Services
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")  
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+--// References
 local LocalPlayer = Players.LocalPlayer
 
--- Controllers
-local AnimationController
-local FishingController
+--// State Variables
+local inited = false
+local running = false
+local idleConn = nil
+local periodicTask = nil
+local VirtualUser = nil
 
--- Network setup
-local NetPath = nil
-local EquipTool, ChargeFishingRod, RequestFishing, FishingCompleted, FishObtainedNotification, BaitSpawnedEvent, ReplicateTextEffect, CancelFishingInputs
-
-local function initializeRemotes()
-    local success = pcall(function()
-        NetPath = ReplicatedStorage:WaitForChild("Packages", 5)
-            :WaitForChild("_Index", 5)
-            :WaitForChild("sleitnick_net@0.2.0", 5)
-            :WaitForChild("net", 5)
-
-        EquipTool = NetPath:WaitForChild("RE/EquipToolFromHotbar", 5)
-        ChargeFishingRod = NetPath:WaitForChild("RF/ChargeFishingRod", 5)
-        RequestFishing = NetPath:WaitForChild("RF/RequestFishingMinigameStarted", 5)
-        FishingCompleted = NetPath:WaitForChild("RE/FishingCompleted", 5)
-        FishObtainedNotification = NetPath:WaitForChild("RE/ObtainedNewFishNotification", 5)
-        BaitSpawnedEvent = NetPath:WaitForChild("RE/BaitSpawned", 5)
-        ReplicateTextEffect = NetPath:WaitForChild("RE/ReplicateTextEffect", 5)
-        CancelFishingInputs = NetPath:WaitForChild("RF/CancelFishingInputs", 5)
-
-        AnimationController = require(ReplicatedStorage.Controllers.AnimationController)
-        FishingController = require(ReplicatedStorage.Controllers.FishingController)
-
-        return true
-    end)
-
-    return success
-end
-
--- Feature state
-local isRunning = false
-local currentMode = "Fast"
-local connection = nil
-local spamConnection = nil
-local fishObtainedConnection = nil
-local baitSpawnedConnection = nil
-local replicateTextConnection = nil
-local controls = {}
-local fishingInProgress = false
-local remotesInitialized = false
-local cancelInProgress = false
-
--- Spam tracking
-local spamActive = false
-local animationCancelEnabled = true
-
--- BaitSpawned counter sejak start
-local baitSpawnedCount = 0
-
--- Tracking untuk deteksi ReplicateTextEffect setelah BaitSpawned
-local waitingForReplicateText = false
-local replicateTextReceived = false
-local WAIT_WINDOW = 0.6
-
--- Animation hooks
-local originalPlayAnimation = nil
-
--- Rod configs
-local FISHING_CONFIGS = {
-    ["Fast"] = {
-        chargeTime = 0.5,
-        waitBetween = 0,
-        rodSlot = 1,
-        spamDelay = 0.05,
-        disableAllAnimations = true
-    },
-    ["Slow"] = {
-        chargeTime = 1.0,
-        waitBetween = 1,
-        rodSlot = 1,
-        spamDelay = 0.1,
-        disableAllAnimations = false
-    }
+--// Bypass Status Tracking
+local bypassStatus = {
+    moduleOverride = false,
+    remoteBlock = false,
+    getConnections = false,
+    periodicReset = false,
+    idledHook = false
 }
 
-function AutoFishFeature:Init(guiControls)
-    controls = guiControls or {}
-    remotesInitialized = initializeRemotes()
-
-    if not remotesInitialized then
-        logger:warn("Failed to initialize remotes")
-        return false
-    end
-
-    self:SetupAnimationHooks()
-
-    logger:info("Initialized V5 - Smart BaitSpawned→ReplicateText detection")
-    return true
-end
-
-function AutoFishFeature:SetupAnimationHooks()
-    if not AnimationController then
-        logger:warn("AnimationController not found")
-        return
-    end
-
-    if not originalPlayAnimation then
-        originalPlayAnimation = AnimationController.PlayAnimation
-
-        AnimationController.PlayAnimation = function(self, animName)
-            if animationCancelEnabled then
-                local fishingAnims = {
-                    "RodThrow",
-                    "StartRodCharge",
-                    "LoopedRodCharge",
-                    "FishCaught",
-                    "FishingFailure",
-                    "EasyFishReel",
-                    "EasyFishReelStart",
-                    "ReelingIdle",
-                    "EquipIdle"
-                }
-
-                for _, animCheck in ipairs(fishingAnims) do
-                    if animName == animCheck or animName:find(animCheck) then
-                        return {
-                            Play = function() end,
-                            Stop = function() end,
-                            Destroy = function() end,
-                            Ended = {
-                                Connect = function() end,
-                                Once = function() end
-                            }
-                        }, nil
-                    end
-                end
-            end
-
-            return originalPlayAnimation(self, animName)
-        end
-
-        logger:info("Animation disable hook installed")
-    end
-
-    self:SetupReplicateTextHook()
-    self:SetupBaitSpawnedHook()
-end
-
-function AutoFishFeature:SetupReplicateTextHook()
-    if not ReplicateTextEffect then
-        logger:warn("ReplicateTextEffect not available")
-        return
-    end
-
-    if replicateTextConnection then
-        replicateTextConnection:Disconnect()
-    end
-
-    replicateTextConnection = ReplicateTextEffect.OnClientEvent:Connect(function(...)
-        if not isRunning then return end
-        
-        logger:info("📝 ReplicateTextEffect received")
-        
-        if waitingForReplicateText then
-            replicateTextReceived = true
-            logger:info("✅ ReplicateTextEffect confirmed - BIARKAN NORMAL")
-        end
-    end)
-
-    logger:info("ReplicateTextEffect hook ready")
-end
-
-function AutoFishFeature:SetupBaitSpawnedHook()
-    if not BaitSpawnedEvent then
-        logger:warn("BaitSpawnedEvent not available")
-        return
-    end
-
-    if baitSpawnedConnection then
-        baitSpawnedConnection:Disconnect()
-    end
-
-    baitSpawnedConnection = BaitSpawnedEvent.OnClientEvent:Connect(function(...)
-        if not isRunning or cancelInProgress then return end
-
-        baitSpawnedCount = baitSpawnedCount + 1
-        logger:info("🎯 BaitSpawned #" .. baitSpawnedCount .. " - Waiting for ReplicateTextEffect...")
-
-        waitingForReplicateText = true
-        replicateTextReceived = false
-
-        spawn(function()
-            task.wait(WAIT_WINDOW)
-            
-            if not isRunning or cancelInProgress then 
-                waitingForReplicateText = false
-                replicateTextReceived = false
-                return 
-            end
-            
-            waitingForReplicateText = false
-            
-            if replicateTextReceived then
-                logger:info("✅ BaitSpawned + ReplicateTextEffect - NORMAL flow")
-            else
-                logger:info("🔄 BaitSpawned SENDIRIAN - CANCEL!")
-                self:CancelAndRestart()
-            end
-            
-            replicateTextReceived = false
-        end)
-    end)
-
-    logger:info("BaitSpawned hook ready")
-end
-
-function AutoFishFeature:CancelAndRestart()
-    if not CancelFishingInputs or cancelInProgress then return end
-
-    cancelInProgress = true
-    logger:info("Executing cancel...")
-
+--// ========================================
+--// BYPASS METHOD 1: Module Override
+--// ========================================
+local function tryOverrideAFKController()
     local success = pcall(function()
-        return CancelFishingInputs:InvokeServer()
-    end)
-
-    if success then
-        logger:info("✅ Cancelled")
-        
-        fishingInProgress = false
-        waitingForReplicateText = false
-        replicateTextReceived = false
-        
-        task.wait(0.15)
-
-        if isRunning then
-            cancelInProgress = false
-            self:ChargeAndCast()
-        else
-            cancelInProgress = false
+        local Controllers = ReplicatedStorage:FindFirstChild("Controllers")
+        if not Controllers then 
+            logger:debug("Controllers folder not found")
+            return 
         end
-    else
-        logger:error("❌ Failed to cancel")
-        fishingInProgress = false
-        cancelInProgress = false
-    end
-end
-
-function AutoFishFeature:ChargeAndCast()
-    if fishingInProgress or cancelInProgress then return end
-
-    fishingInProgress = true
-    local config = FISHING_CONFIGS[currentMode]
-
-    logger:info("⚡ Charge > Cast")
-
-    if not self:ChargeRod(config.chargeTime) then
-        fishingInProgress = false
-        return
-    end
-
-    if not self:CastRod() then
-        fishingInProgress = false
-        return
-    end
-
-    logger:info("Cast done, waiting for BaitSpawned...")
-end
-
-function AutoFishFeature:Start(config)
-    if isRunning then return end
-
-    if not remotesInitialized then
-        logger:warn("Cannot start - remotes not initialized")
-        return
-    end
-
-    isRunning = true
-    currentMode = config.mode or "Fast"
-    fishingInProgress = false
-    spamActive = false
-    baitSpawnedCount = 0
-    waitingForReplicateText = false
-    replicateTextReceived = false
-    cancelInProgress = false
-
-    local cfg = FISHING_CONFIGS[currentMode]
-    animationCancelEnabled = cfg.disableAllAnimations
-
-    logger:info("🚀 Started V5 - Mode:", currentMode)
-    logger:info("📋 Detection: BaitSpawned → wait 150ms → if no ReplicateTextEffect = cancel")
-
-    self:SetupReplicateTextHook()
-    self:SetupBaitSpawnedHook()
-    self:SetupFishObtainedListener()
-    
-    self:StartCompletionSpam(cfg.spamDelay)
-
-    spawn(function()
-        if not self:EquipRod(cfg.rodSlot) then
-            logger:error("Failed to equip rod")
+        
+        local AFKController = Controllers:FindFirstChild("AFKController")
+        if not AFKController or not AFKController:IsA("ModuleScript") then
+            logger:debug("AFKController module not found")
             return
         end
-
-        task.wait(0.2)
-
-        self:ChargeAndCast()
+        
+        -- Wait a bit for module to be loaded
+        task.wait(0.5)
+        
+        local ok, module = pcall(require, AFKController)
+        if not ok or not module then
+            logger:debug("Failed to require AFKController: " .. tostring(module))
+            return
+        end
+        
+        logger:debug("AFKController module loaded successfully")
+        
+        -- Override SetTime to do nothing
+        if module.SetTime then
+            module.SetTime = function(self, arg)
+                logger:debug("Blocked SetTime call with arg: " .. tostring(arg))
+            end
+            logger:info("✓ Overrode AFKController.SetTime")
+        end
+        
+        -- Override RemoveTime to always succeed
+        if module.RemoveTime then
+            local original = module.RemoveTime
+            module.RemoveTime = function(self, reason)
+                logger:debug("RemoveTime called: " .. tostring(reason))
+                pcall(original, self, reason)
+            end
+            logger:info("✓ Overrode AFKController.RemoveTime")
+        end
+        
+        -- Neuter Start function
+        if module.Start then
+            local originalStart = module.Start
+            module.Start = function(self, ...)
+                logger:debug("AFKController.Start intercepted")
+                -- Let it initialize but neuter the timer
+                pcall(originalStart, self, ...)
+                
+                -- Try to find and disable the signal
+                task.spawn(function()
+                    task.wait(1)
+                    pcall(function()
+                        if module.SetTime then
+                            module.SetTime = function() end
+                        end
+                    end)
+                end)
+            end
+            logger:info("✓ Overrode AFKController.Start")
+        end
+        
+        bypassStatus.moduleOverride = true
     end)
+    
+    if not success then
+        logger:debug("Module override attempt failed")
+    end
+    
+    return bypassStatus.moduleOverride
 end
 
-function AutoFishFeature:Stop()
-    if not isRunning then return end
-
-    isRunning = false
-    fishingInProgress = false
-    spamActive = false
-    animationCancelEnabled = false
-    baitSpawnedCount = 0
-    waitingForReplicateText = false
-    replicateTextReceived = false
-    cancelInProgress = false
-
-    if connection then
-        connection:Disconnect()
-        connection = nil
+--// ========================================
+--// BYPASS METHOD 2: Block RemoteEvent
+--// ========================================
+local function tryBlockRemoteEvent()
+    local success = pcall(function()
+        -- Try to find and block the Net package
+        local Packages = ReplicatedStorage:FindFirstChild("Packages")
+        if not Packages then
+            logger:debug("Packages folder not found")
+            return
+        end
+        
+        local NetModule = Packages:FindFirstChild("Net")
+        if not NetModule then
+            logger:debug("Net module not found")
+            return
+        end
+        
+        task.wait(0.5)
+        
+        local ok, Net = pcall(require, NetModule)
+        if not ok or not Net then
+            logger:debug("Failed to require Net module")
+            return
+        end
+        
+        -- Get RemoteEvent reference
+        local ReconnectEvent = Net:RemoteEvent("ReconnectPlayer")
+        
+        if ReconnectEvent then
+            -- Store original for logging
+            local originalFire = ReconnectEvent.FireServer
+            
+            -- Neuter FireServer
+            ReconnectEvent.FireServer = function(...)
+                logger:warn("🛡️ Blocked ReconnectPlayer FireServer attempt!")
+                -- Do nothing, preventing the kick
+            end
+            
+            logger:info("✓ Blocked ReconnectPlayer RemoteEvent")
+            bypassStatus.remoteBlock = true
+        else
+            logger:debug("ReconnectPlayer event not found")
+        end
+    end)
+    
+    if not success then
+        logger:debug("RemoteEvent block attempt failed")
     end
-
-    if spamConnection then
-        spamConnection:Disconnect()
-        spamConnection = nil
-    end
-
-    if fishObtainedConnection then
-        fishObtainedConnection:Disconnect()
-        fishObtainedConnection = nil
-    end
-
-    if baitSpawnedConnection then
-        baitSpawnedConnection:Disconnect()
-        baitSpawnedConnection = nil
-    end
-
-    if replicateTextConnection then
-        replicateTextConnection:Disconnect()
-        replicateTextConnection = nil
-    end
-
-    logger:info("⛔ Stopped V5")
+    
+    return bypassStatus.remoteBlock
 end
 
-function AutoFishFeature:SetupFishObtainedListener()
-    if not FishObtainedNotification then
-        logger:warn("FishObtainedNotification not available")
-        return
+--// ========================================
+--// BYPASS METHOD 3: getconnections
+--// ========================================
+local function tryGetConnections()
+    local GC = getconnections or get_signal_cons
+    if not GC then
+        logger:debug("getconnections not available in executor")
+        return false
     end
-
-    if fishObtainedConnection then
-        fishObtainedConnection:Disconnect()
+    
+    local success = pcall(function()
+        local connections = GC(LocalPlayer.Idled)
+        local disabledCount = 0
+        
+        for i, conn in pairs(connections) do
+            if conn.Disable then
+                conn:Disable()
+                disabledCount = disabledCount + 1
+            elseif conn.Disconnect then
+                conn:Disconnect()
+                disabledCount = disabledCount + 1
+            end
+        end
+        
+        if disabledCount > 0 then
+            logger:info("✓ Disabled " .. disabledCount .. " Idled connections via getconnections")
+            bypassStatus.getConnections = true
+        else
+            logger:debug("No connections found to disable")
+        end
+    end)
+    
+    if not success then
+        logger:debug("getconnections attempt failed")
     end
+    
+    return bypassStatus.getConnections
+end
 
-    fishObtainedConnection = FishObtainedNotification.OnClientEvent:Connect(function(...)
-        if isRunning and not cancelInProgress then
-            logger:info("🎣 FISH OBTAINED!")
-            fishingInProgress = false
-            waitingForReplicateText = false
-            replicateTextReceived = false
+--// ========================================
+--// BYPASS METHOD 4: Periodic Reset
+--// ========================================
+local function setupPeriodicReset()
+    if periodicTask then return end
+    
+    periodicTask = task.spawn(function()
+        while running do
+            -- Wait 4 minutes (well before 15 min threshold)
+            task.wait(240)
             
-            task.wait(0.1)
+            -- Try to call RemoveTime on AFKController
+            pcall(function()
+                local Controllers = ReplicatedStorage:FindFirstChild("Controllers")
+                if not Controllers then return end
+                
+                local AFKController = Controllers:FindFirstChild("AFKController")
+                if not AFKController then return end
+                
+                local ok, module = pcall(require, AFKController)
+                if ok and module and module.RemoveTime then
+                    module:RemoveTime("PeriodicReset")
+                    logger:debug("🔄 Reset AFK timer via RemoveTime()")
+                end
+            end)
             
-            if isRunning and not cancelInProgress then
-                self:ChargeAndCast()
+            -- Also simulate activity via VirtualUser
+            if VirtualUser then
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                    logger:debug("🖱️ Simulated mouse click")
+                end)
             end
         end
     end)
-
-    logger:info("Fish obtained listener ready")
-end
-
-function AutoFishFeature:EquipRod(slot)
-    if not EquipTool then return false end
-
-    local success = pcall(function()
-        EquipTool:FireServer(slot)
-    end)
-
-    return success
-end
-
-function AutoFishFeature:ChargeRod(chargeTime)
-    if not ChargeFishingRod then return false end
-
-    local success = pcall(function()
-        return ChargeFishingRod:InvokeServer(math.huge)
-    end)
-
-    task.wait(chargeTime)
-    return success
-end
-
-function AutoFishFeature:CastRod()
-    if not RequestFishing then return false end
-
-    local success = pcall(function()
-        local y = -139.63
-        local power = 0.9999120558411321
-        return RequestFishing:InvokeServer(y, power)
-    end)
-
-    return success
-end
-
-function AutoFishFeature:StartCompletionSpam(delay)
-    if spamActive then return end
-
-    spamActive = true
-    logger:info("🔥 Starting NON-STOP FishingCompleted spam")
-
-    spawn(function()
-        while spamActive and isRunning do
-            self:FireCompletion()
-            task.wait(delay)
-        end
-        logger:info("Spam stopped")
-    end)
-end
-
-function AutoFishFeature:FireCompletion()
-    if not FishingCompleted then return false end
-
-    pcall(function()
-        FishingCompleted:FireServer()
-    end)
-
+    
+    bypassStatus.periodicReset = true
+    logger:info("✓ Periodic reset active (every 4 minutes)")
     return true
 end
 
-function AutoFishFeature:GetStatus()
-    return {
-        running = isRunning,
-        mode = currentMode,
-        inProgress = fishingInProgress,
-        spamming = spamActive,
-        remotesReady = remotesInitialized,
-        listenerReady = fishObtainedConnection ~= nil,
-        animDisabled = animationCancelEnabled,
-        baitHookReady = baitSpawnedConnection ~= nil,
-        replicateTextHookReady = replicateTextConnection ~= nil,
-        baitSpawnedCount = baitSpawnedCount,
-        waitingForReplicateText = waitingForReplicateText,
-        cancelInProgress = cancelInProgress
-    }
+--// ========================================
+--// BYPASS METHOD 5: Idled Hook (Fallback)
+--// ========================================
+local function setupIdledHook()
+    if idleConn then return end
+    
+    idleConn = LocalPlayer.Idled:Connect(function()
+        -- Don't interfere if user is typing
+        if UserInputService:GetFocusedTextBox() then return end
+        
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+            logger:debug("🖱️ Idled hook triggered - simulated click")
+        end)
+    end)
+    
+    bypassStatus.idledHook = true
+    logger:info("✓ Idled hook active (fallback method)")
+    return true
 end
 
-function AutoFishFeature:SetMode(mode)
-    if FISHING_CONFIGS[mode] then
-        currentMode = mode
-        local cfg = FISHING_CONFIGS[mode]
-        animationCancelEnabled = cfg.disableAllAnimations
+--// ========================================
+--// LIFECYCLE FUNCTIONS
+--// ========================================
 
-        logger:info("Mode:", mode)
-        return true
+function antiafkFeature:Init(guiControls)
+    if inited then return true end
+    
+    -- Get VirtualUser service
+    local ok, vu = pcall(function()
+        return game:GetService("VirtualUser")
+    end)
+    
+    if not ok or not vu then
+        logger:error("VirtualUser service tidak tersedia!")
+        return false
     end
-    return false
+    
+    VirtualUser = vu
+    inited = true
+    logger:info("Anti-AFK initialized")
+    return true
 end
 
-function AutoFishFeature:GetAnimationInfo()
-    return {
-        hookInstalled = originalPlayAnimation ~= nil,
-        cancelEnabled = animationCancelEnabled,
-        baitHookReady = baitSpawnedConnection ~= nil,
-        replicateTextHookReady = replicateTextConnection ~= nil
+function antiafkFeature:Start(config)
+    if running then 
+        logger:warn("Anti-AFK already running")
+        return 
+    end
+    
+    if not inited then
+        local ok = self:Init()
+        if not ok then 
+            logger:error("Failed to initialize Anti-AFK")
+            return 
+        end
+    end
+    
+    running = true
+    logger:info("========================================")
+    logger:info("Starting Anti-AFK with multi-layer bypass...")
+    logger:info("========================================")
+    
+    -- Reset status
+    for k, v in pairs(bypassStatus) do
+        bypassStatus[k] = false
+    end
+    
+    -- Try all bypass methods
+    local methods = {
+        { name = "Module Override", func = tryOverrideAFKController, critical = true },
+        { name = "RemoteEvent Block", func = tryBlockRemoteEvent, critical = true },
+        { name = "getconnections", func = tryGetConnections, critical = false },
+        { name = "Periodic Reset", func = setupPeriodicReset, critical = true },
+        { name = "Idled Hook", func = setupIdledHook, critical = false }
     }
+    
+    local successCount = 0
+    local criticalSuccess = 0
+    
+    for _, method in ipairs(methods) do
+        local success = method.func()
+        if success then
+            successCount = successCount + 1
+            if method.critical then
+                criticalSuccess = criticalSuccess + 1
+            end
+        else
+            local prefix = method.critical and "⚠️" or "ℹ️"
+            logger:warn(prefix .. " " .. method.name .. " failed")
+        end
+    end
+    
+    -- Status Report
+    logger:info("========================================")
+    logger:info("Anti-AFK Status Report:")
+    logger:info("----------------------------------------")
+    logger:info("Module Override:   " .. (bypassStatus.moduleOverride and "✅ ACTIVE" or "❌ FAILED"))
+    logger:info("RemoteEvent Block: " .. (bypassStatus.remoteBlock and "✅ ACTIVE" or "❌ FAILED"))
+    logger:info("getconnections:    " .. (bypassStatus.getConnections and "✅ ACTIVE" or "⚠️ NOT AVAILABLE"))
+    logger:info("Periodic Reset:    " .. (bypassStatus.periodicReset and "✅ ACTIVE" or "❌ FAILED"))
+    logger:info("Idled Hook:        " .. (bypassStatus.idledHook and "✅ ACTIVE" or "❌ FAILED"))
+    logger:info("========================================")
+    
+    -- Safety Assessment
+    if criticalSuccess >= 2 then
+        logger:info("✅ Anti-AFK protection: STRONG")
+        logger:info("   You are protected from both Roblox and AFKController kicks")
+    elseif criticalSuccess >= 1 then
+        logger:warn("⚠️ Anti-AFK protection: MODERATE")
+        logger:warn("   Some bypass methods failed. Monitor for kicks.")
+    else
+        logger:error("❌ Anti-AFK protection: WEAK")
+        logger:error("   Critical methods failed. High risk of kick!")
+    end
+    
+    logger:info("========================================")
+    logger:info(string.format("✓ %d/%d methods active", successCount, #methods))
 end
 
-function AutoFishFeature:Cleanup()
-    logger:info("Cleaning up V5...")
+function antiafkFeature:Stop()
+    if not running then return end
+    
+    running = false
+    
+    -- Cleanup connections
+    if idleConn then 
+        idleConn:Disconnect()
+        idleConn = nil 
+    end
+    
+    -- Cancel periodic task
+    if periodicTask then
+        task.cancel(periodicTask)
+        periodicTask = nil
+    end
+    
+    -- Reset status
+    for k, v in pairs(bypassStatus) do
+        bypassStatus[k] = false
+    end
+    
+    logger:info("Anti-AFK stopped")
+end
+
+function antiafkFeature:Cleanup()
     self:Stop()
-
-    if originalPlayAnimation and AnimationController then
-        AnimationController.PlayAnimation = originalPlayAnimation
-        originalPlayAnimation = nil
-    end
-
-    controls = {}
-    remotesInitialized = false
 end
 
-return AutoFishFeature
+function antiafkFeature:GetStatus()
+    return {
+        running = running,
+        initialized = inited,
+        bypasses = bypassStatus,
+        protection = (bypassStatus.moduleOverride or bypassStatus.remoteBlock) and 
+                     bypassStatus.periodicReset and "STRONG" or "WEAK"
+    }
+end
+
+function antiafkFeature:ForceReset()
+    if not running then return end
+    
+    logger:info("🔄 Manual AFK reset triggered")
+    
+    pcall(function()
+        local Controllers = ReplicatedStorage:FindFirstChild("Controllers")
+        if Controllers then
+            local AFKController = Controllers:FindFirstChild("AFKController")
+            if AFKController then
+                local ok, module = pcall(require, AFKController)
+                if ok and module and module.RemoveTime then
+                    module:RemoveTime("ManualReset")
+                    logger:info("✓ Manually reset AFK timer")
+                end
+            end
+        end
+    end)
+end
+
+return antiafkFeature
